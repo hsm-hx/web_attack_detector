@@ -1,35 +1,29 @@
 package main
 
 import (
-	"fmt"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
-	"io"
-	"log"
+  "fmt"
+  "log"
+  "time"
+  "github.com/google/gopacket"
+  "github.com/google/gopacket/pcap"
 )
 
 var (
-	pcapFile string = "http.cap"
-	handle   *pcap.Handle
-	err      error
+  device string = "wlp3s0"
+  snapshot_len int32 = 1024
+  promiscuous bool = false
+  err error
+  timeout time.Duration = 30 * time.Second
+  handle *pcap.Handle
 )
 
 func main() {
-	handle, err := pcap.OpenOffline(pcapFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer handle.Close()
+  handle, err := pcap.OpenLive(device, snapshot_len, promiscuous, timeout)
+  if err != nil { log.Fatal(err) }
+  defer handle.Close()
 
-	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-	for {
-		packet, err := packetSource.NextPacket()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			log.Println("Error: ", err)
-			continue
-		}
-		fmt.Println(packet)
-	}
+  packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+  for packet := range packetSource.Packets() {
+    fmt.Println(packet)
+  }
 }
