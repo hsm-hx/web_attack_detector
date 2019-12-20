@@ -1,38 +1,63 @@
 package main
 
 import (
-  "fmt"
-  "log"
-  "time"
-  "github.com/google/gopacket"
-  "github.com/google/gopacket/pcap"
+	"fmt"
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
+	"log"
+	"net"
+	"time"
 )
 
 var (
-  device string = "eth1"
-  snapshot_len int32 = 1024
-  promiscuous bool = false
-  err error
-  timeout time.Duration = 30 * time.Second
-  handle *pcap.Handle
+	device      string = "eth1"
+	snapshot    int32  = 1024
+	promiscuous bool   = false
+	err         error
+	timeout     time.Duration = 30 * time.Second
+	handle      *pcap.Handle
 )
 
+func getMyIPAddress() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if ipnet.IP.To4() != nil {
+				return ipnet.IP.String()
+			}
+		}
+	}
+	return ""
+}
+
 func main() {
-  handle, err := pcap.OpenLive(device, snapshot_len, promiscuous, timeout)
-  if err != nil { log.Fatal(err) }
-  defer handle.Close()
+	handle, err := pcap.OpenLive(device, snapshot, promiscuous, timeout)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer handle.Close()
 
-  /*
-  var filter string = "tcp and port 80"
-  err = handle.SetBPFFilter(filter)
-  if err != nil {
-    log.Fatal(err)
-  }
-  fmt.Println("only capturing TCP port 80 packets.")
-  */
+	err = handle.SetDirection(pcap.DirectionIn)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-  packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
-  for packet := range packetSource.Packets() {
-    fmt.Println(packet)
-  }
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
+	fmt.Println("My IP Address: " + getMyIPAddress())
+
+	beforeTime := time.Now()
+	for packet := range packetSource.Packets() {
+		// パケットを受信するごとに時刻を取ってしきい値以下ならほげほげ
+		currentTime := time.Now()
+		sub := beforeTime.Sub(currentTime)
+		beforeTime = currentTime
+
+		fmt.Println("====================================================")
+		fmt.Println(sub)
+		fmt.Println(packet)
+	}
 }
